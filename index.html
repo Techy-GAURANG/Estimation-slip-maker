@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estimation Slip Maker</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body style="margin:0;padding:0;">
+  <div id="root"></div>
+  
+  <script>
+    const { useState, useRef, useEffect } = React;
+    const { render } = ReactDOM;
+    
+    function EstimationSlipApp() {
+      const [slips, setSlips] = useState([]);
+      const [currentSlip, setCurrentSlip] = useState(null);
+      const [showSettings, setShowSettings] = useState(false);
+      const [settings, setSettings] = useState({
+        companyName: 'Your Company Name',
+        companyAddress: '123 Business Street, City, State, India',
+        companyPhone: '+91 98765 43210',
+        companyEmail: 'info@company.com',
+        currency: '₹'
+      });
+
+      useEffect(() => {
+        const savedSlips = localStorage.getItem('estimationSlips');
+        const savedSettings = localStorage.getItem('appSettings');
+        if (savedSlips) setSlips(JSON.parse(savedSlips));
+        if (savedSettings) setSettings(JSON.parse(savedSettings));
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('estimationSlips', JSON.stringify(slips));
+        localStorage.setItem('appSettings', JSON.stringify(settings));
+      }, [slips, settings]);
+
+      const createNewSlip = () => {
+        const newSlip = {
+          id: Date.now(),
+          slipNumber: 'EST-' + Date.now().toString().slice(-6),
+          date: new Date().toISOString().split('T')[0],
+          clientName: '',
+          clientAddress: '',
+          clientPhone: '',
+          clientEmail: '',
+          items: [{ id: 1, description: '', quantity: 1, rate: 0, amount: 0 }],
+          notes: '',
+          total: 0
+        };
+        setCurrentSlip(newSlip);
+      };
+
+      const addItem = () => {
+        if (!currentSlip) return;
+        const newItem = {
+          id: Date.now(),
+          description: '',
+          quantity: 1,
+          rate: 0,
+          amount: 0
+        };
+        setCurrentSlip({
+          ...currentSlip,
+          items: [...currentSlip.items, newItem]
+        });
+      };
+
+      const updateItem = (id, field, value) => {
+        const updatedItems = currentSlip.items.map(item => {
+          if (item.id === id) {
+            const updated = { ...item, [field]: value };
+            if (field === 'quantity' || field === 'rate') {
+              updated.amount = updated.quantity * updated.rate;
+            }
+            return updated;
+          }
+          return item;
+        });
+        
+        const total = updatedItems.reduce((sum, item) => sum + item.amount, 0);
+        setCurrentSlip({
+          ...currentSlip,
+          items: updatedItems,
+          total
+        });
+      };
+
+      const deleteItem = (id) => {
+        if (currentSlip.items.length <= 1) {
+          alert('Cannot delete the last item');
+          return;
+        }
+        const updatedItems = currentSlip.items.filter(item => item.id !== id);
+        const total = updatedItems.reduce((sum, item) => sum + item.amount, 0);
+        setCurrentSlip({
+          ...currentSlip,
+          items: updatedItems,
+          total
+        });
+      };
+
+      const saveSlip = () => {
+        if (!currentSlip) return;
+        if (!currentSlip.clientName.trim()) {
+          alert('Please enter client name');
+          return;
+        }
+        const existingIndex = slips.findIndex(s => s.id === currentSlip.id);
+        if (existingIndex >= 0) {
+          const updated = [...slips];
+          updated[existingIndex] = currentSlip;
+          setSlips(updated);
+        } else {
+          setSlips([...slips, currentSlip]);
+        }
+        alert('Saved successfully!');
+      };
+
+      const loadSlip = (slip) => {
+        setCurrentSlip({ ...slip });
+      };
+
+      const deleteSlip = (id) => {
+        if (confirm('Delete this slip?')) {
+          setSlips(slips.filter(s => s.id !== id));
+          if (currentSlip?.id === id) setCurrentSlip(null);
+        }
+      };
+
+      const handlePrint = () => {
+        if (!currentSlip) {
+          alert('No slip to print');
+          return;
+        }
+        window.print();
+      };
+
+      return React.createElement('div', { 
+        style: { minHeight: '100vh', background: 'linear-gradient(to bottom right, #eff6ff, #e0e7ff)' }
+      },
+        React.createElement('div', { 
+          className: 'no-print',
+          style: { background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 50 }
+        },
+          React.createElement('div', { style: { maxWidth: '1280px', margin: '0 auto', padding: '16px' }},
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }},
+              React.createElement('h1', { style: { fontSize: '24px', fontWeight: 'bold' }}, 'Estimation Slip Maker'),
+              React.createElement('div', { style: { display: 'flex', gap: '8px' }},
+                React.createElement('button', {
+                  onClick: createNewSlip,
+                  style: { padding: '8px 16px', background: '#4f46e5', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }
+                }, 'New Slip'),
+                React.createElement('button', {
+                  onClick: () => setShowSettings(!showSettings),
+                  style: { padding: '8px 16px', background: '#6b7280', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }
+                }, 'Settings')
+              )
+            )
+          )
+        ),
+        
+        showSettings && React.createElement('div', { 
+          className: 'no-print',
+          style: { maxWidth: '1280px', margin: '16px auto', padding: '0 16px' }
+        },
+          React.createElement('div', { style: { background: 'white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '24px' }},
+            React.createElement('h2', { style: { fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}, 'Company Settings'),
+            React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }},
+              React.createElement('input', {
+                type: 'text',
+                placeholder: 'Company Name',
+                value: settings.companyName,
+                onChange: (e) => setSettings({ ...settings, companyName: e.target.value }),
+                style: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }
+              }),
+              React.createElement('input', {
+                type: 'text',
+                placeholder: 'Address',
+                value: settings.companyAddress,
+                onChange: (e) => setSettings({ ...settings, companyAddress: e.target.value }),
+                style: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }
+              }),
+              React.createElement('input', {
+                type: 'text',
+                placeholder: 'Phone',
+                value: settings.companyPhone,
+                onChange: (e) => setSettings({ ...settings, companyPhone: e.target.value }),
+                style: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }
+              }),
+              React.createElement('input', {
+                type: 'email',
+                placeholder: 'Email',
+                value: settings.companyEmail,
+                onChange: (e) => setSettings({ ...settings, companyEmail: e.target.value }),
+                style: { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }
+              })
+            )
+          )
+        ),
+        
+        React.createElement('div', { style: { maxWidth: '1280px', margin: '0 auto', padding: '24px 16px' }},
+          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '24px' }},
+            React.createElement('div', { 
+              className: 'no-print',
+              style: { background: 'white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '16px' }
+            },
+              React.createElement('h2', { style: { fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}, 'Saved Slips'),
+              React.createElement('div', { style: { maxHeight: '400px', overflowY: 'auto' }},
+                slips.length === 0 
+                  ? React.createElement('p', { style: { color: '#6b7280', fontSize: '14px' }}, 'No saved slips')
+                  : slips.map(slip =>
+                      React.createElement('div', {
+                        key: slip.id,
+                        onClick: () => loadSlip(slip),
+                        style: { padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', marginBottom: '8px', cursor: 'pointer' }
+                      },
+                        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between' }},
+                          React.createElement('div', null,
+                            React.createElement('p', { style: { fontWeight: '600', fontSize: '14px' }}, slip.slipNumber),
+                            React.createElement('p', { style: { fontSize: '12px', color: '#6b7280' }}, slip.clientName || 'No client'),
+                            React.createElement('p', { style: { fontSize: '12px', color: '#9ca3af' }}, slip.date)
+                          ),
+                          React.createElement('button', {
+                            onClick: (e) => {
+                              e.stopPropagation();
+                              deleteSlip(slip.id);
+                            },
+                            style: { color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }
+                          }, '🗑️')
+                        )
+                      )
+                    )
+              )
+            ),
+            
+            !currentSlip 
+              ? React.createElement('div', { style: { background: 'white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '48px', textAlign: 'center' }},
+                  React.createElement('h2', { style: { fontSize: '24px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}, 'No Slip Selected'),
+                  React.createElement('p', { style: { color: '#6b7280', marginBottom: '24px' }}, 'Create a new slip or select one'),
+                  React.createElement('button', {
+                    onClick: createNewSlip,
+                    style: { padding: '12px 24px', background: '#4f46e5', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '16px' }
+                  }, 'Create New Slip')
+                )
+              : React.createElement('div', { 
+                  className: 'slip-content',
+                  style: { background: 'white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }
+                },
+                  React.createElement('div', { 
+                    className: 'no-print',
+                    style: { padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '8px' }
+                  },
+                    React.createElement('button', {
+                      onClick: saveSlip,
+                      style: { padding: '8px 16px', background: '#10b981', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }
+                    }, '💾 Save'),
+                    React.createElement('button', {
+                      onClick: handlePrint,
+                      style: { padding: '8px 16px', background: '#3b82f6', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }
+                    }, '🖨️ Print'),
+                    React.createElement('button', {
+                      onClick: () => {
+                        alert('In print dialog, choose "Save as PDF"');
+                        setTimeout(() => window.print(), 500);
+                      },
+                      style: { padding: '8px 16px', background: '#8b5cf6', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }
+                    }, '📄 Export PDF')
+                  ),
+                  
+                  React.createElement('div', { 
+                    className: 'print-content',
+                    style: { padding: '32px' }
+                  },
+                    React.createElement('div', { style: { textAlign: 'center', marginBottom: '32px', borderBottom: '2px solid #4f46e5', paddingBottom: '16px' }},
+                      React.createElement('h1', { style: { fontSize: '28px', fontWeight: 'bold', color: '#4f46e5', marginBottom: '8px' }}, settings.companyName),
+                      React.createElement('p', { style: { fontSize: '14px', color: '#6b7280' }}, settings.companyAddress),
+                      React.createElement('p', { style: { fontSize: '14px', color: '#6b7280' }}, settings.companyPhone + ' | ' + settings.companyEmail)
+                    ),
+                    
+                    React.createElement('h2', { style: { fontSize: '24px', fontWeight: 'bold', textAlign: 'center', marginBottom: '24px' }}, 'ESTIMATION SLIP'),
+                    
+                    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }},
+                      React.createElement('div', null,
+                        React.createElement('h3', { style: { fontWeight: 'bold', fontSize: '16px', marginBottom: '12px' }}, 'Estimation Details'),
+                        React.createElement('div', { style: { marginBottom: '8px' }},
+                          React.createElement('label', { style: { fontSize: '12px', color: '#6b7280' }}, 'Slip Number'),
+                          React.createElement('input', {
+                            type: 'text',
+                            value: currentSlip.slipNumber,
+                            onChange: (e) => setCurrentSlip({ ...currentSlip, slipNumber: e.target.value }),
+                            style: { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px' }
+                          })
+                        ),
+                        React.createElement('div', null,
+                          React.createElement('label', { style: { fontSize: '12px', color: '#6b7280' }}, 'Date'),
+                          React.createElement('input', {
+                            type: 'date',
+                            value: currentSlip.date,
+                            onChange: (e) => setCurrentSlip({ ...currentSlip, date: e.target.value }),
+                            style: { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px' }
+                          })
+                        )
+                      ),
+                      React.createElement('div', null,
+                        React.createElement('h3', { style: { fontWeight: 'bold', fontSize: '16px', marginBottom: '12px' }}, 'Client Information'),
+                        React.createElement('input', {
+                          type: 'text',
+                          placeholder: 'Client Name *',
+                          value: currentSlip.clientName,
+                          onChange: (e) => setCurrentSlip({ ...currentSlip, clientName: e.target.value }),
+                          style: { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', marginBottom: '8px' }
+                        }),
+                        React.createElement('input', {
+                          type: 'text',
+                          placeholder: 'Address',
+                          value: currentSlip.clientAddress,
+                          onChange: (e) => setCurrentSlip({ ...currentSlip, clientAddress: e.target.value }),
+                          style: { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', marginBottom: '8px' }
+                        }),
+                        React.createElement('input', {
+                          type: 'text',
+                          placeholder: 'Phone',
+                          value: currentSlip.clientPhone,
+                          onChange: (e) => setCurrentSlip({ ...currentSlip, clientPhone: e.target.value }),
+                          style: { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', marginBottom: '8px' }
+                        }),
+                        React.createElement('input', {
+                          type: 'email',
+                          placeholder: 'Email',
+                          value: currentSlip.clientEmail,
+                          onChange: (e) => setCurrentSlip({ ...currentSlip, clientEmail: e.target.value }),
+                          style: { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px' }
+                        })
+                      )
+                    ),
+                    
+                    React.createElement('div', { style: { marginBottom: '32px' }},
+                      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }},
+                        React.createElement('h3', { style: { fontWeight: 'bold', fontSize: '16px' }}, 'Items'),
+                        React.createElement('button', {
+                          onClick: addItem,
+                          className: 'no-print',
+                          style: { padding: '4px 12px', background: '#4f46e5', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer', fontSize: '14px' }
+                        }, '+ Add Item')
+                      ),
+                      React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' }},
+                        React.createElement('thead', null,
+                          React.createElement('tr', { style: { background: '#f3f4f6' }},
+                            React.createElement('th', { style: { border: '1px solid #d1d5db', padding: '8px', textAlign: 'left' }}, 'Description'),
+                            React.createElement('th', { style: { border: '1px solid #d1d5db', padding: '8px', textAlign: 'center', width: '80px' }}, 'Qty'),
+                            React.createElement('th', { style: { border: '1px solid #d1d5db', padding: '8px', textAlign: 'right', width: '120px' }}, 'Rate (₹)'),
+                            React.createElement('th', { style: { border: '1px solid #d1d5db', padding: '8px', textAlign: 'right', width: '120px' }}, 'Amount (₹)'),
+                            React.createElement('th', { className: 'no-print', style: { border: '1px solid #d1d5db', padding: '8px', width: '50px' }}, '')
+                          )
+                        ),
+                        React.createElement('tbody', null,
+                          currentSlip.items.map(item =>
+                            React.createElement('tr', { key: item.id },
+                              React.createElement('td', { style: { border: '1px solid #d1d5db', padding: '8px' }},
+                                React.createElement('input', {
+                                  type: 'text',
+                                  value: item.description,
+                                  onChange: (e) => updateItem(item.id, 'description', e.target.value),
+                                  placeholder: 'Item description',
+                                  style: { width: '100%', padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: '4px' }
+                                })
+                              ),
+                              React.createElement('td', { style: { border: '1px solid #d1d5db', padding: '8px' }},
+                                React.createElement('input', {
+                                  type: 'number',
+                                  min: '0',
+                                  value: item.quantity,
+                                  onChange: (e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0),
+                                  style: { width: '100%', padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: '4px', textAlign: 'center' }
+                                })
+                              ),
+                              React.createElement('td', { style: { border: '1px solid #d1d5db', padding: '8px' }},
+                                React.createElement('input', {
+                                  type: 'number',
+                                  min: '0',
+                                  step: '0.01',
+                                  value: item.rate,
+                                  onChange: (e) => updateItem(item.id, 'rate', parseFloat(e.target.value) || 0),
+                                  style: { width: '100%', padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: '4px', textAlign: 'right' }
+                                })
+                              ),
+                              React.createElement('td', { style: { border: '1px solid #d1d5db', padding: '8px' }},
+                                React.createElement('input', {
+                                  type: 'number',
+                                  min: '0',
+                                  step: '0.01',
+                                  value: item.amount,
+                                  onChange: (e) => updateItem(item.id, 'amount', parseFloat(e.target.value) || 0),
+                                  style: { width: '100%', padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: '4px', textAlign: 'right', fontWeight: '600' }
+                                })
+                              ),
+                              React.createElement('td', { className: 'no-print', style: { border: '1px solid #d1d5db', padding: '8px', textAlign: 'center' }},
+                                React.createElement('button', {
+                                  onClick: () => deleteItem(item.id),
+                                  disabled: currentSlip.items.length <= 1,
+                                  style: { color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }
+                                }, '🗑️')
+                              )
+                            )
+                          )
+                        )
+                      )
+                    ),
+                    
+                    React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end', marginBottom: '32px' }},
+                      React.createElement('div', { style: { width: '300px' }},
+                        React.createElement('div', { style: { background: '#eff6ff', padding: '16px', borderRadius: '8px', border: '2px solid #4f46e5' }},
+                          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between' }},
+                            React.createElement('span', { style: { fontSize: '20px', fontWeight: 'bold' }}, 'Total Amount:'),
+                            React.createElement('span', { style: { fontSize: '24px', fontWeight: 'bold', color: '#4f46e5' }}, settings.currency + currentSlip.total.toFixed(2))
+                          )
+                        )
+                      )
+                    ),
+                    
+                    React.createElement('div', null,
+                      React.createElement('h3', { style: { fontWeight: 'bold', marginBottom: '8px' }}, 'Terms & Conditions / Notes'),
+                      React.createElement('textarea', {
+                        value: currentSlip.notes,
+                        onChange: (e) => setCurrentSlip({ ...currentSlip, notes: e.target.value }),
+                        placeholder: 'Additional notes, terms & conditions...',
+                        style: { width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '100px' }
+                      })
+                    ),
+                    
+                    React.createElement('div', { style: { marginTop: '32px', paddingTop: '16px', borderTop: '1px solid #e5e7eb', textAlign: 'center', fontSize: '14px', color: '#6b7280' }},
+                      React.createElement('p', { style: { fontWeight: '600' }}, 'Thank you for your business!'),
+                      React.createElement('p', { style: { fontSize: '12px', marginTop: '8px' }}, 'This is an estimation slip and not a final invoice')
+                    )
+                  )
+                )
+          )
+        )
+      );
+    }
+    
+    render(React.createElement(EstimationSlipApp), document.getElementById('root'));
+  </script>
+  
+  <style>
+    @media print {
+      @page { size: A4; margin: 10mm; }
+      body * { visibility: hidden; }
+      .slip-content, .slip-content * { visibility: visible; }
+      .slip-content { position: absolute; left: 0; top: 0; width: 100%; }
+      .no-print { display: none !important; }
+      input, textarea { border: none !important; }
+      table { border-collapse: collapse; }
+      table th, table td { border: 1px solid #333 !important; padding: 8px !important; }
+    }
+  </style>
+</body>
+</html>
